@@ -675,6 +675,11 @@ jobs:
           $conf.bundle.createUpdaterArtifacts = $false
           $conf | ConvertTo-Json -Depth 30 | Set-Content $path -Encoding utf8
 
+      - name: Clear Sherpa prebuilt cache
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force (Join-Path $env:GITHUB_WORKSPACE "target" "sherpa-onnx-prebuilt") -ErrorAction SilentlyContinue
+
       - name: Build Tauri binary (no bundle)
         working-directory: frontend
         shell: pwsh
