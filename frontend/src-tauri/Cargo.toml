@@ -58,6 +58,7 @@ reqwest = { version = "0.11", features = ["blocking", "multipart", "json", "stre
 which = "6.0.1"
 zip = "2.2"           # ZIP extraction (Windows, macOS)
 tar = "0.4"           # TAR extraction (Linux)
+bzip2 = "0.4"         # bzip2 decompression (Sherpa prebuilt archives)
 xz2 = "0.1"           # XZ decompression (Linux)
 
 

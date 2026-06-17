@@ -74,6 +74,14 @@ if (-not $Exe) {
 if (-not $Exe) { throw "meetily.exe not found after build" }
 Copy-Item $Exe (Join-Path $OutDir "meetily.exe")
 Write-Host "Copied main executable from $Exe"
+# Copy runtime DLLs
+foreach ($rel in @($WorkspaceRelease)) {
+  if (-not (Test-Path $rel)) { continue }
+  Get-ChildItem -Path $rel -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.Name -match "sherpa|onnxruntime|kaldi|kaldifst|fst|fbank|kissfft|piper|espeak|ssentencepiece|ucd") { Copy-Item $_.FullName $OutDir -Force }
+  }
+}
+# runtime dll copy placeholder
 
 $SidecarCandidates = @(
   (Join-Path $WorkspaceRelease "llama-helper-$TargetTriple.exe"),

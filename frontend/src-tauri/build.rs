@@ -1,5 +1,7 @@
 #[path = "build/ffmpeg.rs"]
 mod ffmpeg;
+#[path = "build/sherpa_dlls.rs"]
+mod sherpa_dlls;
 
 fn main() {
     // GPU Acceleration Detection and Build Guidance
@@ -17,6 +19,10 @@ fn main() {
 
     // Download and bundle FFmpeg binary at build-time
     ffmpeg::ensure_ffmpeg_binary();
+
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        sherpa_dlls::stage_sherpa_dlls_for_bundle();
+    }
 
     tauri_build::build()
 }
