@@ -678,7 +678,11 @@ jobs:
       - name: Clear Sherpa prebuilt cache
         shell: pwsh
         run: |
-          Remove-Item -Recurse -Force (Join-Path $env:GITHUB_WORKSPACE "target" "sherpa-onnx-prebuilt") -ErrorAction SilentlyContinue
+          $root = Join-Path $env:GITHUB_WORKSPACE "target"
+          Remove-Item -Recurse -Force (Join-Path $root "sherpa-onnx-prebuilt") -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $root -Recurse -Directory -Filter "build" -ErrorAction SilentlyContinue | ForEach-Object {
+            Get-ChildItem -Path $_.FullName -Directory -Filter "sherpa-onnx-sys-*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+          }
 
       - name: Build Tauri binary (no bundle)
         working-directory: frontend
