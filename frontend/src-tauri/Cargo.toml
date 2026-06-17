@@ -105,7 +105,6 @@ silero_rs = { git = "https://github.com/emotechlab/silero-rs", rev = "26a6460", 
 # Parakeet (ONNX-based fast transcription) dependencies
 ort = { version = "2.0.0-rc.10" }  # ONNX Runtime for Parakeet models
 thiserror = "2.0.16"
-sherpa-onnx = "1.13.3"                # Error handling for Parakeet
 
 # Async
 tokio = { version = "1.32.0", features = ["full", "tracing"] }
@@ -186,6 +185,7 @@ whisper-rs = { version = "0.13.2", features = ["raw-api", "metal", "coreml"] }
 #   --features openblas (OpenBLAS optimization, requires BLAS_INCLUDE_DIRS)
 [target.'cfg(target_os = "windows")'.dependencies]
 whisper-rs = { version = "0.13.2", features = ["raw-api"] }
+sherpa-onnx = { version = "1.13.3", default-features = false, features = ["shared"] }
 futures-channel = "0.3.31"
 
 # Linux-specific dependencies
@@ -198,6 +198,10 @@ futures-channel = "0.3.31"
 [target.'cfg(target_os = "linux")'.dependencies]
 whisper-rs = { version = "0.13.2", features = ["raw-api"] }
 futures-channel = "0.3.31"
+
+# Sherpa-ONNX: static on non-Windows
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+sherpa-onnx = { version = "1.13.3", default-features = false, features = ["static"] }
 
 [dev-dependencies]
 tempfile = "3.3.0"
