@@ -3,7 +3,7 @@
 use crate::api::TranscriptSegment;
 use crate::audio::decoder::{decode_audio_file, decode_audio_file_with_progress};
 use crate::audio::vad::get_speech_chunks_with_progress;
-use crate::config::{DEFAULT_WHISPER_MODEL, DEFAULT_PARAKEET_MODEL};
+use crate::config::{DEFAULT_WHISPER_MODEL, DEFAULT_PARAKEET_MODEL, DEFAULT_SHERPA_MODEL};
 use crate::parakeet_engine::ParakeetEngine;
 use crate::state::AppState;
 use crate::whisper_engine::WhisperEngine;
@@ -265,7 +265,7 @@ pub async fn start_import<R: Runtime>(
     // Reset cancellation flag
     IMPORT_CANCELLED.store(false, Ordering::SeqCst);
 
-    let use_parakeet = provider.as_deref() == Some("parakeet");
+    let provider_for_unload = provider.clone();
     let result = run_import(
         app.clone(),
         source_path,
@@ -277,7 +277,7 @@ pub async fn start_import<R: Runtime>(
     .await;
 
     // Unload the engine after the batch job (success, failure, or cancellation)
-    super::common::unload_engine_after_batch(use_parakeet).await;
+    super::common::unload_engine_after_batch(provider_for_unload.as_deref()).await;
 
     // Guard will automatically clear flag on drop
     // No need for manual: IMPORT_IN_PROGRESS.store(false, Ordering::SeqCst);
@@ -329,6 +329,7 @@ async fn run_import<R: Runtime>(
     );
 
     // Determine which provider to use (default to whisper)
+    let use_sherpa = provider.as_deref() == Some("sherpaOnnx");
     let use_parakeet = provider.as_deref() == Some("parakeet");
 
     emit_progress(&app, "copying", 5, "Creating meeting folder...");
@@ -508,13 +509,18 @@ async fn run_import<R: Runtime>(
     emit_progress(&app, "transcribing", 30, "Loading transcription engine...");
 
     // Initialize the appropriate engine
-    let whisper_engine = if !use_parakeet && total_segments > 0 {
+    let whisper_engine = if !use_parakeet && !use_sherpa && total_segments > 0 {
         Some(get_or_init_whisper(&app, model.as_deref()).await?)
     } else {
         None
     };
     let parakeet_engine = if use_parakeet && total_segments > 0 {
         Some(get_or_init_parakeet(&app, model.as_deref()).await?)
+    } else {
+        None
+    };
+    let sherpa_engine = if use_sherpa && total_segments > 0 {
+        Some(get_or_init_sherpa(&app, model.as_deref()).await?)
     } else {
         None
     };
@@ -579,7 +585,14 @@ async fn run_import<R: Runtime>(
         }
 
         // Transcribe
-        let (text, conf) = if use_parakeet {
+        let (text, conf) = if use_sherpa {
+            let engine = sherpa_engine.as_ref().unwrap();
+            let text = engine
+                .transcribe_audio(segment.samples.clone(), language.clone())
+                .await
+                .map_err(|e| anyhow!("Sherpa transcription failed on segment {}: {}", i, e))?;
+            (text, 0.9f32)
+        } else if use_parakeet {
             let engine = parakeet_engine.as_ref().unwrap();
             let text = engine
                 .transcribe_audio(segment.samples.clone())
@@ -794,6 +807,28 @@ async fn get_or_init_whisper<R: Runtime>(
 }
 
 /// Get or initialize the Parakeet engine
+
+async fn get_or_init_sherpa<R: Runtime>(
+    app: &AppHandle<R>,
+    requested_model: Option<&str>,
+) -> Result<Arc<crate::sherpa_engine::SherpaEngine>> {
+    use crate::sherpa_engine::commands::{sherpa_init, SHERPA_ENGINE};
+    sherpa_init().await.map_err(|e| anyhow!("Failed to init Sherpa: {}", e))?;
+    let engine = { let guard = SHERPA_ENGINE.lock().unwrap_or_else(|e| e.into_inner()); guard.as_ref().cloned() };
+    match engine {
+        Some(e) => {
+            let target_model = match requested_model { Some(model) => model.to_string(), None => get_configured_model(app, "sherpaOnnx").await? };
+            let current_model = e.get_current_model().await;
+            let needs_load = matches!(&current_model, None) || current_model.as_ref().map(|m| m != &target_model).unwrap_or(true);
+            if needs_load {
+                let _ = e.discover_models().await;
+                e.load_model(&target_model).await.map_err(|e| anyhow!("Failed to load Sherpa model: {}", e))?;
+            }
+            Ok(e)
+        }
+        None => Err(anyhow!("Sherpa engine not initialized")),
+    }
+}
 async fn get_or_init_parakeet<R: Runtime>(
     app: &AppHandle<R>,
     requested_model: Option<&str>,
@@ -856,22 +891,15 @@ async fn get_configured_model<R: Runtime>(app: &AppHandle<R>, provider_type: &st
         Some((provider, model)) => {
             if (provider_type == "whisper" && (provider == "localWhisper" || provider == "whisper"))
                 || (provider_type == "parakeet" && provider == "parakeet")
+                || (provider_type == "sherpaOnnx" && provider == "sherpaOnnx")
             {
                 Ok(model)
             } else {
                 // Return default model for the requested type
-                Ok(if provider_type == "parakeet" {
-                    DEFAULT_PARAKEET_MODEL.to_string()
-                } else {
-                    DEFAULT_WHISPER_MODEL.to_string()
-                })
+                Ok(if provider_type == "parakeet" { DEFAULT_PARAKEET_MODEL.to_string() } else if provider_type == "sherpaOnnx" { DEFAULT_SHERPA_MODEL.to_string() } else { DEFAULT_WHISPER_MODEL.to_string() })
             }
         }
-        None => Ok(if provider_type == "parakeet" {
-            DEFAULT_PARAKEET_MODEL.to_string()
-        } else {
-            DEFAULT_WHISPER_MODEL.to_string()
-        }),
+        None => Ok(if provider_type == "parakeet" { DEFAULT_PARAKEET_MODEL.to_string() } else if provider_type == "sherpaOnnx" { DEFAULT_SHERPA_MODEL.to_string() } else { DEFAULT_WHISPER_MODEL.to_string() }),
     }
 }
 

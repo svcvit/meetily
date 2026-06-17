@@ -107,8 +107,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   // Transcript model configuration state
   const [transcriptModelConfig, setTranscriptModelConfig] = useState<TranscriptModelProps>({
-    provider: 'parakeet',
-    model: 'parakeet-tdt-0.6b-v3-int8',
+    provider: 'sherpaOnnx',
+    model: 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17-int8',
     apiKey: null
   });
 
@@ -199,8 +199,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (config) {
           console.log('[ConfigContext] Loaded saved transcript config:', config);
           setTranscriptModelConfig({
-            provider: config.provider || 'parakeet',
-            model: config.model || 'parakeet-tdt-0.6b-v3-int8',
+            provider: config.provider || 'sherpaOnnx',
+            model: config.model || 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17-int8',
             apiKey: config.apiKey || null
           });
         }

@@ -118,7 +118,7 @@ interface LanguageSelectionProps {
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
   disabled?: boolean;
-  provider?: 'localWhisper' | 'parakeet' | 'deepgram' | 'elevenLabs' | 'groq' | 'openai';
+  provider?: 'localWhisper' | 'sherpaOnnx' | 'parakeet' | 'deepgram' | 'elevenLabs' | 'groq' | 'openai';
 }
 
 export function LanguageSelection({
@@ -131,8 +131,11 @@ export function LanguageSelection({
   const { setSelectedLanguage } = useConfig();
 
   // Parakeet only supports auto-detection (doesn't support manual language selection)
+  const isSherpa = provider === 'sherpaOnnx';
   const isParakeet = provider === 'parakeet';
-  const availableLanguages = isParakeet
+  const availableLanguages = isSherpa
+    ? LANGUAGES.filter(lang => lang.code === 'auto' || lang.code === 'zh')
+    : isParakeet
     ? LANGUAGES.filter(lang => lang.code === 'auto' || lang.code === 'auto-translate')
     : LANGUAGES;
 

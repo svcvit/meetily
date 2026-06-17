@@ -8,7 +8,7 @@ export interface RawModelInfo {
 }
 
 export interface ModelOption {
-  provider: 'whisper' | 'parakeet';
+  provider: 'whisper' | 'parakeet' | 'sherpaOnnx';
   name: string;
   displayName: string;
   size_mb: number;
@@ -77,6 +77,23 @@ export function useTranscriptionModels(transcriptModelConfig: TranscriptModelCon
       console.error('Failed to fetch Parakeet models:', err);
     }
 
+// Fetch Sherpa models
+    try {
+      await invoke('sherpa_init');
+      const sherpaModels = await invoke<RawModelInfo[]>('sherpa_get_available_models');
+      const availableSherpa = sherpaModels
+        .filter((m) => m.status === 'Available')
+        .map((m) => ({
+          provider: 'sherpaOnnx' as const,
+          name: m.name,
+          displayName: `⚡ Sherpa: ${m.name}`,
+          size_mb: m.size_mb,
+        }));
+      allModels.push(...availableSherpa);
+    } catch (err) {
+      console.error('Failed to fetch Sherpa models:', err);
+    }
+
     setAvailableModels(allModels);
 
     // Set default model based on user's saved configuration
@@ -88,7 +105,8 @@ export function useTranscriptionModels(transcriptModelConfig: TranscriptModelCon
     const configuredMatch = allModels.find(
       (m) =>
         (configuredProvider === 'localWhisper' && m.provider === 'whisper' && m.name === configuredModel) ||
-        (configuredProvider === 'parakeet' && m.provider === 'parakeet' && m.name === configuredModel)
+        (configuredProvider === 'parakeet' && m.provider === 'parakeet' && m.name === configuredModel) ||
+        (configuredProvider === 'sherpaOnnx' && m.provider === 'sherpaOnnx' && m.name === configuredModel)
     );
 
     // Only set default model if user hasn't manually selected one

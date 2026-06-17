@@ -646,6 +646,10 @@ pub async fn stop_recording<R: Runtime>(
     };
 
     match config.as_deref() {
+        Some("sherpaOnnx") => {
+            let engine_clone = { let engine_guard = crate::sherpa_engine::commands::SHERPA_ENGINE.lock().unwrap(); engine_guard.as_ref().cloned() };
+            if let Some(engine) = engine_clone { let _ = engine.unload_model().await; }
+        }
         Some("parakeet") => {
             info!("🦜 Unloading Parakeet model...");
             let engine_clone = {

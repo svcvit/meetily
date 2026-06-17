@@ -81,6 +81,7 @@ pub fn start_transcription_task<R: Runtime>(
             let engine_clone = match &transcription_engine {
                 TranscriptionEngine::Whisper(e) => TranscriptionEngine::Whisper(e.clone()),
                 TranscriptionEngine::Parakeet(e) => TranscriptionEngine::Parakeet(e.clone()),
+                TranscriptionEngine::Sherpa(e) => TranscriptionEngine::Sherpa(e.clone()),
                 TranscriptionEngine::Provider(p) => TranscriptionEngine::Provider(p.clone()),
             };
             let app_clone = app.clone();
@@ -155,7 +156,7 @@ pub fn start_transcription_task<R: Runtime>(
                                     // Provider-aware confidence threshold
                                     let confidence_threshold = match &engine_clone {
                                         TranscriptionEngine::Whisper(_) | TranscriptionEngine::Provider(_) => 0.3,
-                                        TranscriptionEngine::Parakeet(_) => 0.0, // Parakeet has no confidence, accept all
+                                        TranscriptionEngine::Parakeet(_) | TranscriptionEngine::Sherpa(_) => 0.0, // Parakeet has no confidence, accept all
                                     };
 
                                     let confidence_str = match confidence_opt {
@@ -519,6 +520,17 @@ async fn transcribe_chunk_with_provider<R: Runtime>(
 
                     Err(transcription_error)
                 }
+            }
+        }
+        TranscriptionEngine::Sherpa(sherpa_engine) => {
+            let language = crate::get_language_preference_internal();
+            match sherpa_engine.transcribe_audio(speech_samples, language).await {
+                Ok(text) => {
+                    let cleaned_text = text.trim().to_string();
+                    if cleaned_text.is_empty() { return Ok((String::new(), None, false)); }
+                    Ok((cleaned_text, None, false))
+                }
+                Err(e) => Err(TranscriptionError::EngineFailed(e.to_string())),
             }
         }
         TranscriptionEngine::Provider(provider) => {

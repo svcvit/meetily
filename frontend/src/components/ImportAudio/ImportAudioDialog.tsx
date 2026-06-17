@@ -169,13 +169,17 @@ export function ImportAudioDialog({
     const name = selectedModelKey.slice(colonIndex + 1);
     return availableModels.find((m) => m.provider === provider && m.name === name);
   }, [selectedModelKey, availableModels]);
+  const isSherpaModel = selectedModel?.provider === 'sherpaOnnx';
   const isParakeetModel = selectedModel?.provider === 'parakeet';
 
   useEffect(() => {
     if (isParakeetModel && selectedLang !== 'auto') {
       setSelectedLang('auto');
     }
-  }, [isParakeetModel, selectedLang]);
+    if (isSherpaModel && selectedLang !== 'auto' && selectedLang !== 'zh') {
+      setSelectedLang('auto');
+    }
+  }, [isParakeetModel, isSherpaModel, selectedLang]);
 
   const handleSelectFile = async () => {
     const info = await selectFile();
@@ -190,7 +194,7 @@ export function ImportAudioDialog({
     await startImport(
       fileInfo.path,
       title || fileInfo.filename,
-      isParakeetModel ? null : selectedLang === 'auto' ? null : selectedLang,
+      isParakeetModel ? null : isSherpaModel ? (selectedLang === 'auto' ? null : selectedLang) : selectedLang === 'auto' ? null : selectedLang,
       selectedModel?.name || null,
       selectedModel?.provider || null
     );
@@ -354,7 +358,7 @@ export function ImportAudioDialog({
                               <SelectValue placeholder="Select language" />
                             </SelectTrigger>
                             <SelectContent className="max-h-60">
-                              {LANGUAGES.map((lang) => (
+                              {(isSherpaModel ? LANGUAGES.filter((lang) => lang.code === 'auto' || lang.code === 'zh') : LANGUAGES).map((lang) => (
                                 <SelectItem key={lang.code} value={lang.code}>
                                   {lang.name}
                                 </SelectItem>

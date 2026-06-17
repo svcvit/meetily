@@ -11,6 +11,9 @@ pub const DEFAULT_WHISPER_MODEL: &str = "large-v3-turbo";
 /// This is the quantized version optimized for speed.
 pub const DEFAULT_PARAKEET_MODEL: &str = "parakeet-tdt-0.6b-v3-int8";
 
+/// Default Sherpa-ONNX SenseVoice model for transcription when no preference is configured.
+pub const DEFAULT_SHERPA_MODEL: &str = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17-int8";
+
 /// Whisper model catalog with metadata for all supported models.
 /// Used by both WhisperEngine::discover_models() and discover_models_standalone().
 ///

@@ -72,8 +72,8 @@ const Sidebar: React.FC = () => {
     ollamaEndpoint: null
   });
   const [transcriptModelConfig, setTranscriptModelConfig] = useState<TranscriptModelProps>({
-    provider: 'parakeet',
-    model: 'parakeet-tdt-0.6b-v3-int8',
+    provider: 'sherpaOnnx',
+    model: 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17-int8',
   });
   const [settingsSaveSuccess, setSettingsSaveSuccess] = useState<boolean | null>(null);
 

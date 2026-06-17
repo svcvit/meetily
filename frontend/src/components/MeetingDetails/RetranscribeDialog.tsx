@@ -92,13 +92,17 @@ export function RetranscribeDialog({
     const name = selectedModelKey.slice(colonIndex + 1);
     return availableModels.find(m => m.provider === provider && m.name === name);
   }, [selectedModelKey, availableModels]);
+  const isSherpaModel = selectedModelDetails?.provider === 'sherpaOnnx';
   const isParakeetModel = selectedModelDetails?.provider === 'parakeet';
 
   useEffect(() => {
     if (isParakeetModel && selectedLang !== 'auto') {
       setSelectedLang('auto');
     }
-  }, [isParakeetModel, selectedLang]);
+    if (isSherpaModel && selectedLang !== 'auto' && selectedLang !== 'zh') {
+      setSelectedLang('auto');
+    }
+  }, [isParakeetModel, isSherpaModel, selectedLang]);
 
   // Reset state only when dialog transitions from closed to open
   // This prevents re-initialization when config changes while dialog is already open
@@ -207,9 +211,9 @@ export function RetranscribeDialog({
     setProgress(null);
 
     try {
-      const languageToSend = isParakeetModel ? null : selectedLang === 'auto' ? null : selectedLang;
+      const languageToSend = isParakeetModel ? null : isSherpaModel ? (selectedLang === 'auto' ? null : selectedLang) : selectedLang === 'auto' ? null : selectedLang;
       await Analytics.track('enhance_transcript_started', {
-        language: isParakeetModel ? 'auto' : (selectedLang === 'auto' ? 'auto' : selectedLang),
+        language: isParakeetModel ? 'auto' : isSherpaModel ? (selectedLang === 'auto' ? 'auto' : selectedLang) : (selectedLang === 'auto' ? 'auto' : selectedLang),
         model_provider: selectedModelDetails?.provider || '',
         model_name: selectedModelDetails?.name || ''
       });
@@ -312,7 +316,7 @@ export function RetranscribeDialog({
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {LANGUAGES.map((lang) => (
+                    {(isSherpaModel ? LANGUAGES.filter((lang) => lang.code === 'auto' || lang.code === 'zh') : LANGUAGES).map((lang) => (
                       <SelectItem key={lang.code} value={lang.code}>
                         {lang.name}
                       </SelectItem>

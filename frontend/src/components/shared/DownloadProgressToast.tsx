@@ -299,6 +299,85 @@ export function useDownloadProgressToast() {
       unlistenError.then((fn) => fn());
     };
   }, [updateDownload, cleanupDownload]);
+  useEffect(() => {
+    const unlistenProgress = listen<{
+      modelName: string;
+      progress: number;
+      downloaded_mb?: number;
+      total_mb?: number;
+      speed_mbps?: number;
+      status?: string;
+    }>('sherpa-model-download-progress', (event) => {
+      const { modelName, progress, downloaded_mb, total_mb, speed_mbps, status } = event.payload;
+
+      const downloadData: DownloadProgress = {
+        modelName,
+        displayName: 'Transcription Model (Sherpa ONNX)',
+        progress,
+        downloadedMb: downloaded_mb ?? 0,
+        totalMb: total_mb ?? 670,
+        speedMbps: speed_mbps ?? 0,
+        status: status === 'cancelled'
+          ? 'cancelled'
+          : status === 'completed' || progress >= 100
+          ? 'completed'
+          : 'downloading',
+      };
+
+      updateDownload(modelName, downloadData);
+
+      // Clean up cancelled downloads after delay to auto-dismiss toast
+      if (downloadData.status === 'cancelled') {
+        cleanupDownload(modelName, 6000); // 5s toast + 1s buffer
+      }
+      // Removed direct showDownloadToast call here, handled by effect
+    });
+
+    const unlistenComplete = listen<{ modelName: string }>(
+      'sherpa-model-download-complete',
+      (event) => {
+        const { modelName } = event.payload;
+        const downloadData: DownloadProgress = {
+          modelName,
+          displayName: 'Transcription Model (Sherpa ONNX)',
+          progress: 100,
+          downloadedMb: 670,
+          totalMb: 670,
+          speedMbps: 0,
+          status: 'completed',
+        };
+        updateDownload(modelName, downloadData);
+        // Clean up after 4 seconds (completion toast duration is 3s + 1s buffer)
+        cleanupDownload(modelName, 4000);
+      }
+    );
+
+    const unlistenError = listen<{ modelName: string; error: string }>(
+      'sherpa-model-download-error',
+      (event) => {
+        const { modelName, error } = event.payload;
+        const downloadData: DownloadProgress = {
+          modelName,
+          displayName: 'Transcription Model (Sherpa ONNX)',
+          progress: 0,
+          downloadedMb: 0,
+          totalMb: 670,
+          speedMbps: 0,
+          status: 'error',
+          error: categorizeError(error),
+        };
+        updateDownload(modelName, downloadData);
+        // Clean up after 11 seconds (error toast duration is 10s + 1s buffer)
+        cleanupDownload(modelName, 11000);
+      }
+    );
+
+    return () => {
+      unlistenProgress.then((fn) => fn());
+      unlistenComplete.then((fn) => fn());
+      unlistenError.then((fn) => fn());
+    };
+  }, [updateDownload, cleanupDownload]);
 
   // Listen to Built-in AI summary model download events
   useEffect(() => {

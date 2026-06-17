@@ -49,6 +49,7 @@ pub mod anthropic;
 pub mod groq;
 pub mod openrouter;
 pub mod parakeet_engine;
+pub mod sherpa_engine;
 pub mod state;
 pub mod summary;
 pub mod tray;
@@ -64,9 +65,9 @@ use tokio::sync::RwLock;
 
 static RECORDING_FLAG: AtomicBool = AtomicBool::new(false);
 
-// Global language preference storage (default to "auto-translate" for automatic translation to English)
+// Global language preference storage (default to "auto" for automatic language detection)
 static LANGUAGE_PREFERENCE: std::sync::LazyLock<StdMutex<String>> =
-    std::sync::LazyLock::new(|| StdMutex::new("auto-translate".to_string()));
+    std::sync::LazyLock::new(|| StdMutex::new("auto".to_string()));
 
 #[derive(Debug, Deserialize)]
 struct RecordingArgs {
@@ -471,6 +472,14 @@ pub fn run() {
                 }
             });
 
+            sherpa_engine::commands::set_models_directory(&_app.handle());
+
+            tauri::async_runtime::spawn(async {
+                if let Err(e) = sherpa_engine::commands::sherpa_init().await {
+                    log::error!("Failed to initialize Sherpa engine on startup: {}", e);
+                }
+            });
+
             // Initialize ModelManager for summary engine (async, non-blocking)
             let app_handle_for_model_manager = _app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -582,6 +591,20 @@ pub fn run() {
             parakeet_engine::commands::parakeet_cancel_download,
             parakeet_engine::commands::parakeet_delete_corrupted_model,
             parakeet_engine::commands::open_parakeet_models_folder,
+            sherpa_engine::commands::sherpa_init,
+            sherpa_engine::commands::sherpa_get_available_models,
+            sherpa_engine::commands::sherpa_load_model,
+            sherpa_engine::commands::sherpa_get_current_model,
+            sherpa_engine::commands::sherpa_is_model_loaded,
+            sherpa_engine::commands::sherpa_has_available_models,
+            sherpa_engine::commands::sherpa_validate_model_ready,
+            sherpa_engine::commands::sherpa_transcribe_audio,
+            sherpa_engine::commands::sherpa_get_models_directory,
+            sherpa_engine::commands::sherpa_download_model,
+            sherpa_engine::commands::sherpa_retry_download,
+            sherpa_engine::commands::sherpa_cancel_download,
+            sherpa_engine::commands::sherpa_delete_corrupted_model,
+            sherpa_engine::commands::open_sherpa_models_folder,
             // Parallel processing commands
             whisper_engine::parallel_commands::initialize_parallel_processor,
             whisper_engine::parallel_commands::start_parallel_processing,

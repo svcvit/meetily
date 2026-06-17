@@ -14,7 +14,8 @@ use tauri::{AppHandle, Manager, Runtime};
 // Transcription engine abstraction to support multiple providers
 pub enum TranscriptionEngine {
     Whisper(Arc<crate::whisper_engine::WhisperEngine>),  // Direct access (backward compat)
-    Parakeet(Arc<crate::parakeet_engine::ParakeetEngine>), // Direct access (backward compat)
+    Parakeet(Arc<crate::parakeet_engine::ParakeetEngine>),
+    Sherpa(Arc<crate::sherpa_engine::SherpaEngine>), // Direct access (backward compat)
     Provider(Arc<dyn TranscriptionProvider>),  // Trait-based (preferred for new code)
 }
 
@@ -24,6 +25,7 @@ impl TranscriptionEngine {
         match self {
             Self::Whisper(engine) => engine.is_model_loaded().await,
             Self::Parakeet(engine) => engine.is_model_loaded().await,
+            Self::Sherpa(engine) => engine.is_model_loaded().await,
             Self::Provider(provider) => provider.is_model_loaded().await,
         }
     }
@@ -33,6 +35,7 @@ impl TranscriptionEngine {
         match self {
             Self::Whisper(engine) => engine.get_current_model().await,
             Self::Parakeet(engine) => engine.get_current_model().await,
+            Self::Sherpa(engine) => engine.get_current_model().await,
             Self::Provider(provider) => provider.get_current_model().await,
         }
     }
@@ -42,6 +45,7 @@ impl TranscriptionEngine {
         match self {
             Self::Whisper(_) => "Whisper (direct)",
             Self::Parakeet(_) => "Parakeet (direct)",
+            Self::Sherpa(_) => "SherpaOnnx (direct)",
             Self::Provider(provider) => provider.provider_name(),
         }
     }
@@ -69,18 +73,18 @@ pub async fn validate_transcription_model_ready<R: Runtime>(app: &AppHandle<R>) 
             config
         }
         Ok(None) => {
-            info!("📝 No transcript config found, defaulting to parakeet");
+            info!("📝 No transcript config found, defaulting to sherpaOnnx");
             crate::api::api::TranscriptConfig {
-                provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
+                provider: "sherpaOnnx".to_string(),
+                model: crate::config::DEFAULT_SHERPA_MODEL.to_string(),
                 api_key: None,
             }
         }
         Err(e) => {
-            warn!("⚠️ Failed to get transcript config: {}, defaulting to parakeet", e);
+            warn!("⚠️ Failed to get transcript config: {}, defaulting to sherpaOnnx", e);
             crate::api::api::TranscriptConfig {
-                provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
+                provider: "sherpaOnnx".to_string(),
+                model: crate::config::DEFAULT_SHERPA_MODEL.to_string(),
                 api_key: None,
             }
         }
@@ -107,6 +111,26 @@ pub async fn validate_transcription_model_ready<R: Runtime>(app: &AppHandle<R>) 
                 }
                 Err(e) => {
                     warn!("❌ Whisper model validation failed: {}", e);
+                    Err(e)
+                }
+            }
+        }
+        "sherpaOnnx" => {
+            info!("Validating Sherpa-ONNX model...");
+            if let Err(init_error) = crate::sherpa_engine::commands::sherpa_init().await {
+                warn!("Failed to initialize Sherpa engine: {}", init_error);
+                return Err(format!(
+                    "Failed to initialize Sherpa speech recognition: {}",
+                    init_error
+                ));
+            }
+            match crate::sherpa_engine::commands::sherpa_validate_model_ready_with_config(app).await {
+                Ok(model_name) => {
+                    info!("Sherpa model validation successful: {} is ready", model_name);
+                    Ok(())
+                }
+                Err(e) => {
+                    warn!("Sherpa model validation failed: {}", e);
                     Err(e)
                 }
             }
@@ -138,7 +162,7 @@ pub async fn validate_transcription_model_ready<R: Runtime>(app: &AppHandle<R>) 
         other => {
             warn!("❌ Unsupported transcription provider for local recording: {}", other);
             Err(format!(
-                "Provider '{}' is not supported for local transcription. Please select 'localWhisper' or 'parakeet'.",
+                "Provider '{}' is not supported for local transcription. Please select 'localWhisper', 'sherpaOnnx', or 'parakeet'.",
                 other
             ))
         }
@@ -165,18 +189,18 @@ pub async fn get_or_init_transcription_engine<R: Runtime>(
             config
         }
         Ok(None) => {
-            info!("📝 No transcript config found, defaulting to parakeet");
+            info!("📝 No transcript config found, defaulting to sherpaOnnx");
             crate::api::api::TranscriptConfig {
-                provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
+                provider: "sherpaOnnx".to_string(),
+                model: crate::config::DEFAULT_SHERPA_MODEL.to_string(),
                 api_key: None,
             }
         }
         Err(e) => {
-            warn!("⚠️ Failed to get transcript config: {}, defaulting to parakeet", e);
+            warn!("⚠️ Failed to get transcript config: {}, defaulting to sherpaOnnx", e);
             crate::api::api::TranscriptConfig {
-                provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
+                provider: "sherpaOnnx".to_string(),
+                model: crate::config::DEFAULT_SHERPA_MODEL.to_string(),
                 api_key: None,
             }
         }
@@ -210,6 +234,26 @@ pub async fn get_or_init_transcription_engine<R: Runtime>(
                 None => {
                     Err("Parakeet engine not initialized. This should not happen after validation.".to_string())
                 }
+            }
+        }
+        "sherpaOnnx" => {
+            info!("Initializing Sherpa-ONNX transcription engine");
+            if let Err(init_error) = crate::sherpa_engine::commands::sherpa_init().await {
+                return Err(format!("Failed to initialize Sherpa engine: {}", init_error));
+            }
+            let engine = {
+                let guard = crate::sherpa_engine::commands::SHERPA_ENGINE.lock().unwrap();
+                guard.as_ref().cloned()
+            };
+            match engine {
+                Some(engine) => {
+                    if engine.is_model_loaded().await {
+                        Ok(TranscriptionEngine::Sherpa(engine))
+                    } else {
+                        Err("Sherpa engine initialized but no model loaded.".to_string())
+                    }
+                }
+                None => Err("Sherpa engine not initialized.".to_string()),
             }
         }
         "localWhisper" | _ => {

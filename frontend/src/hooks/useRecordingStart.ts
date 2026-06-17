@@ -34,7 +34,7 @@ export function useRecordingStart(
 
   const { clearTranscripts, setMeetingTitle } = useTranscripts();
   const { setIsMeetingActive } = useSidebar();
-  const { selectedDevices } = useConfig();
+  const { selectedDevices, transcriptModelConfig } = useConfig();
   const { setStatus } = useRecordingState();
 
   // Generate meeting title with timestamp
@@ -50,13 +50,13 @@ export function useRecordingStart(
   }, []);
 
   // Check if Parakeet transcription model is ready
-  const checkParakeetReady = useCallback(async (): Promise<boolean> => {
+  const checkTranscriptionReady = useCallback(async (): Promise<boolean> => {
     try {
-      await invoke('parakeet_init');
-      const hasModels = await invoke<boolean>('parakeet_has_available_models');
+      await invoke('sherpa_init');
+      const hasModels = await invoke<boolean>('sherpa_has_available_models');
       return hasModels;
     } catch (error) {
-      console.error('Failed to check Parakeet status:', error);
+      console.error('Failed to check Sherpa status:', error);
       return false;
     }
   }, []);
@@ -64,7 +64,7 @@ export function useRecordingStart(
   // Check if any model is currently downloading
   const checkIfModelDownloading = useCallback(async (): Promise<boolean> => {
     try {
-      const models = await invoke<any[]>('parakeet_get_available_models');
+      const models = await invoke<any[]>('sherpa_get_available_models');
       const isDownloading = models.some(m =>
         m.status && (
           typeof m.status === 'object'
@@ -82,10 +82,10 @@ export function useRecordingStart(
   // Handle manual recording start (from button click)
   const handleRecordingStart = useCallback(async () => {
     try {
-      console.log('handleRecordingStart called - checking Parakeet model status');
+      console.log('handleRecordingStart called - checking transcription model status');
 
       // Check if Parakeet transcription model is ready before starting
-      const parakeetReady = await checkParakeetReady();
+      const parakeetReady = await checkTranscriptionReady();
       if (!parakeetReady) {
         const isDownloading = await checkIfModelDownloading();
         if (isDownloading) {
@@ -106,7 +106,7 @@ export function useRecordingStart(
         return;
       }
 
-      console.log('Parakeet ready - setting up meeting title and state');
+      console.log('Transcription model ready - setting up meeting title and state');
 
       const randomTitle = generateMeetingTitle();
       setMeetingTitle(randomTitle);
@@ -141,7 +141,7 @@ export function useRecordingStart(
       // Re-throw so RecordingControls can handle device-specific errors
       throw error;
     }
-  }, [generateMeetingTitle, setMeetingTitle, setIsRecording, clearTranscripts, setIsMeetingActive, checkParakeetReady, checkIfModelDownloading, selectedDevices, showModal, setStatus]);
+  }, [generateMeetingTitle, setMeetingTitle, setIsRecording, clearTranscripts, setIsMeetingActive, checkTranscriptionReady, checkIfModelDownloading, selectedDevices, showModal, setStatus]);
 
   // Check for autoStartRecording flag and start recording automatically
   useEffect(() => {
@@ -154,7 +154,7 @@ export function useRecordingStart(
           sessionStorage.removeItem('autoStartRecording'); // Clear the flag
 
           // Check if Parakeet transcription model is ready before starting
-          const parakeetReady = await checkParakeetReady();
+          const parakeetReady = await checkTranscriptionReady();
           if (!parakeetReady) {
             const isDownloading = await checkIfModelDownloading();
             if (isDownloading) {
@@ -224,7 +224,7 @@ export function useRecordingStart(
     setIsRecording,
     clearTranscripts,
     setIsMeetingActive,
-    checkParakeetReady,
+    checkTranscriptionReady,
     checkIfModelDownloading,
     showModal,
     setStatus,
@@ -238,11 +238,11 @@ export function useRecordingStart(
         return;
       }
 
-      console.log('Direct start from sidebar - checking Parakeet model status');
+      console.log('Direct start from sidebar - checking transcription model status');
       setIsAutoStarting(true);
 
       // Check if Parakeet transcription model is ready before starting
-      const parakeetReady = await checkParakeetReady();
+      const parakeetReady = await checkTranscriptionReady();
       if (!parakeetReady) {
         const isDownloading = await checkIfModelDownloading();
         if (isDownloading) {
@@ -313,7 +313,7 @@ export function useRecordingStart(
     setIsRecording,
     clearTranscripts,
     setIsMeetingActive,
-    checkParakeetReady,
+    checkTranscriptionReady,
     checkIfModelDownloading,
     showModal,
     setStatus,
