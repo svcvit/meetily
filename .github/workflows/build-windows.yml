@@ -673,6 +673,7 @@ jobs:
           $path = 'frontend/src-tauri/tauri.conf.json'
           $conf = Get-Content $path -Raw | ConvertFrom-Json
           $conf.bundle.createUpdaterArtifacts = $false
+          if ($conf.bundle.windows) { $conf.bundle.windows.PSObject.Properties.Remove('signCommand') }
           $conf | ConvertTo-Json -Depth 30 | Set-Content $path -Encoding utf8
 
       - name: Clear Sherpa prebuilt cache
