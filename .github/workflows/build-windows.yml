@@ -734,7 +734,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          pnpm tauri bundle -- --target x86_64-pc-windows-msvc --features vulkan ${{ steps.build-profile.outputs.args }}
+          pnpm tauri bundle --bundles msi,nsis ${{ steps.build-profile.outputs.args }}
       - name: Verify build artifacts
         shell: bash
         run: |
