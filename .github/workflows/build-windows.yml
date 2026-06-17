@@ -684,6 +684,22 @@ jobs:
             Get-ChildItem -Path $_.FullName -Directory -Filter "sherpa-onnx-sys-*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
           }
 
+      - name: Prepare Sherpa ONNX import libs
+        shell: pwsh
+        run: |
+          $archive = "sherpa-onnx-v1.13.3-win-x64-shared-MT-Release-lib.tar.bz2"
+          $url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.3/$archive"
+          $cache = Join-Path $env:GITHUB_WORKSPACE "target/sherpa-download"
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile (Join-Path $cache $archive)
+          tar -xjf (Join-Path $cache $archive) -C $cache
+          $libDir = Get-ChildItem -Path $cache -Recurse -Directory | Where-Object { $_.Name -eq "lib" } | Select-Object -First 1
+          if (-not $libDir) { Write-Error "Sherpa lib directory not found after extract"; exit 1 }
+          $apiLib = Join-Path $libDir.FullName "sherpa-onnx-c-api.lib"
+          if (-not (Test-Path $apiLib)) { Write-Error "Missing $apiLib"; exit 1 }
+          Write-Host "Using SHERPA_ONNX_LIB_DIR=$($libDir.FullName)"
+          "SHERPA_ONNX_LIB_DIR=$($libDir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build Tauri binary (no bundle)
         working-directory: frontend
         shell: pwsh
