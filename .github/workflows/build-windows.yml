@@ -686,7 +686,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          pnpm tauri build -- --target x86_64-pc-windows-msvc --features vulkan --no-bundle ${{ steps.build-profile.outputs.args }}
+          pnpm tauri build --no-bundle -- --target x86_64-pc-windows-msvc --features vulkan ${{ steps.build-profile.outputs.args }}
 
       - name: Stage Sherpa runtime DLLs
         shell: pwsh
