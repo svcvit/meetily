@@ -666,6 +666,15 @@ jobs:
           path: frontend/src-tauri/binaries/ffmpeg-*.exe
           key: ${{ runner.os }}-ffmpeg-${{ hashFiles('frontend/src-tauri/build.rs', 'frontend/src-tauri/build/ffmpeg.rs') }}
 
+      - name: Disable updater artifacts for unsigned build
+        if: ${{ github.event.inputs.sign-build != 'true' }}
+        shell: pwsh
+        run: |
+          $path = 'frontend/src-tauri/tauri.conf.json'
+          $conf = Get-Content $path -Raw | ConvertFrom-Json
+          $conf.bundle.createUpdaterArtifacts = $false
+          $conf | ConvertTo-Json -Depth 30 | Set-Content $path -Encoding utf8
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
