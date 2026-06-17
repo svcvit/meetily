@@ -675,22 +675,41 @@ jobs:
           $conf.bundle.createUpdaterArtifacts = $false
           $conf | ConvertTo-Json -Depth 30 | Set-Content $path -Encoding utf8
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri binary (no bundle)
+        working-directory: frontend
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tauri updater signing (ALWAYS enabled for .sig files)
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # License validation RSA public key (embedded at build time)
           MEETILY_RSA_PUBLIC_KEY: ${{ secrets.MEETILY_RSA_PUBLIC_KEY }}
-          # Supabase configuration (for online license verification)
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        with:
-          projectPath: frontend
-          args: --target x86_64-pc-windows-msvc --features vulkan ${{ steps.build-profile.outputs.args }}
+        run: |
+          pnpm tauri build -- --target x86_64-pc-windows-msvc --features vulkan --no-bundle ${{ steps.build-profile.outputs.args }}
 
+      - name: Stage Sherpa runtime DLLs
+        shell: pwsh
+        run: |
+          $profile = "${{ steps.build-profile.outputs.profile }}"
+          $release = Join-Path $env:GITHUB_WORKSPACE "target/x86_64-pc-windows-msvc/$profile"
+          $dest = Join-Path $env:GITHUB_WORKSPACE "frontend/src-tauri/sherpa-dlls"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          if (Test-Path $release) { Get-ChildItem -Path $release -Filter "*.dll" -File | Where-Object { $_.Name -match "sherpa|onnxruntime|kaldi|fst|fbank|kissfft|piper|espeak|ssentencepiece|ucd" } | ForEach-Object { Copy-Item -Force $_.FullName (Join-Path $dest $_.Name) } }
+          if (-not (Test-Path (Join-Path $dest "sherpa-onnx-c-api.dll"))) { Write-Error "sherpa-onnx-c-api.dll missing"; exit 1 }
+
+      - name: Bundle Windows installers
+        working-directory: frontend
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MEETILY_RSA_PUBLIC_KEY: ${{ secrets.MEETILY_RSA_PUBLIC_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          pnpm tauri bundle -- --target x86_64-pc-windows-msvc --features vulkan ${{ steps.build-profile.outputs.args }}
       - name: Verify build artifacts
         shell: bash
         run: |
